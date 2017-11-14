@@ -1,0 +1,849 @@
+---
+title: "Codes R pour le cours de Lyon du 2 au 9 novembre 2017"
+author: "Etienne Marceau"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output:
+  pdf_document:
+    number_sections: yes
+    toc: yes
+    toc_depth: 2
+  html_document:
+    df_print: paged
+    toc: yes
+    toc_depth: '2'
+biblio-style: apalike
+header-includes: \renewcommand{\contentsname}{Table des matières} \renewcommand{\abstractname}{Résumé}
+bibliography: blabla.bib
+abstract: Le présent document contient les exemples de codes R construits pendant le cours de Lyon du 2 au 9 novembre 2017. \newpage
+---
+
+***
+
+\newpage
+
+
+# Préface
+
+
+**Outil pédagogique**. Le présent document est un outil pédagogique qui porte sur la modélisation des risques en actuariat. Il contient des codes R qui ont été rédigés dans le cadre d'un cours sur le sujet (ISFA, Université Lyon 1). Il est un complément à l'ouvrage de référence [@marceau2013modelisation] pour le cours.  
+
+
+**Prérequis**. Les prérequis pour ce document sont principalement des cours de bases en mathématiques, en probabilité et en statistique.  
+
+
+**Conditions d'utilisation**. Ce document est en cours de rédaction, ce qui implique que son contenu est continuellement révisé et mis à jour. Bien qu'il utilise R depuis 2000, son auteur se considère comme un débutant en R. Les codes R peuvent aussi être conçus de manière plus efficiente. De plus, il peut y avoir encore des erreurs et son contenu doit être encore amélioré. Pour cette raison, le lecteur à inviter à nous communiquer tout commentaire et / ou correction qu'il peut avoir. 
+Les conditions suivantes d'utilisation doivent être respectées :
+\begin{itemize}
+\item Ce document a été conçu pour des fins pédagogiques, personnelles et non-commerciales. Toute utilisation commerciale ou reproduction est interdite.
+\item Son contenu demeure la propriété de son auteur.  
+\end{itemize}
+
+
+**Calculs et illustrations**. Toutes les calculs et les illustrations ont été réalisés dans le langage R grâce au logiciel GNU R mis à disposition par le R Project. Les codes R ont été conçus dans l'environnement de développement intégré RStudio.
+
+
+Le logiciel GNU R et les bibliothèques sont disponibles sur le site du R Project et du Comprehensive R Archive Network (CRAN) : 
+\begin{itemize}
+\item https://cran.r-project.org/
+\end{itemize}
+
+
+L'environnement RStudio est disponible sur le site suivant :
+\begin{itemize}
+\item https://www.rstudio.com/products/rstudio/download/.  
+\end{itemize}
+
+
+**Édition**. Le présent document a été rédigé en R Markdown dans l'environnement R Studio. Pour cette raion, ce document peut être vu comme un outil interactif. Notamment, il est possible d'éxécuter l'ensemble du contenu en modifiant les paramètres de codes R. Pour une introduction à R Markdown, voir : 
+\begin{itemize}
+\item http://archimede.mat.ulaval.ca/dokuwiki/doku.php?id=r:communication:rmarkdown
+\item https://rmarkdown.rstudio.com/  
+\end{itemize}
+
+**Citation** : Marceau, E. (2017). Codes R pour le cours de Lyon 2-9 novembre 2017. 
+Disponible sur : https://www.actrisk.act.ulaval.ca  
+
+
+**Dernière version** : `r format(Sys.time(), '%d %B %Y')`.
+
+
+
+\newpage
+
+# Notions de base
+
+
+## Loi gamma et mesures de risque
+
+Soit $X \sim Gamma(\alpha,\beta)$. Le code R contient des calculs pour $VaR_{\kappa}(X)$ et $TVaR_{\kappa}(X)$.
+
+Code R :
+
+```{r}
+# Loi gamma
+#
+alp<-5
+bet<-1/2
+vu<-(1:999)/1000
+VaRX<-qgamma(vu,alp,bet)
+EX<-alp/bet
+vEX<-rep(EX,999)
+TVaRX<-EX*(1-pgamma(VaRX,alp+1,bet))/(1-vu)
+matplot(vu,cbind(TVaRX,VaRX,vEX),type="l",main="Loi gamma",xlab="u",ylab="VaR et TVaR", col=rep(1,3))
+
+```
+
+\newpage
+
+## Loi binomiale et mesures de risque
+
+Soit $X \sim Bin(r,q)$. Le code R contient des calculs pour $VaR_{\kappa}(X)$ et $TVaR_{\kappa}(X)$.
+
+Code R :
+
+```{r}
+#
+# Loi binomiale
+#
+qq<-0.0017
+bb<-100000
+EX<-bb*qq
+EX
+kap<-0.995
+VaRX<-bb*qbinom(kap,1,qq)
+VaRX
+TVaRX<-EX/(1-kap)
+TVaRX
+vn<-c(1,10,100,1000,10000,100000,1000000)
+vVaRN<-qbinom(kap,vn,qq)
+vVaRN
+vVaRS<-bb*vVaRN
+vVaRS
+nono<-length(vn)
+vTVaRN<-rep(0,nono)
+for (i in 1:nono)
+{
+ vk<-0:vn[i]
+ partie1<-sum(vk*dbinom(vk,vn[i],qq)*1*(vk>vVaRN[i]))
+ partie2<-vVaRN[i]*(pbinom(vVaRN[i],vn[i],qq)-kap)
+ vTVaRN[i]<-(partie1+partie2)/(1-kap) 
+}
+cbind(kap,vVaRN,vTVaRN)
+vTVaRS<-bb*vTVaRN
+round(cbind(vn,vVaRS/vn,vTVaRS/vn,TVaRX-vTVaRS/vn),2)
+round(cbind(vn,vVaRS/vn,vTVaRS/vn,TVaRX-vTVaRS/vn),2)
+
+```
+
+\newpage
+
+## Mutualisation des risques
+
+Soit $\underline(X) = (X_1,...,X_n)$ un vecteur de v.a. i.i.d. On définit $$S_n = X_1+...+X_n$$ et $$W_n = \frac{Sn}{n}.$$ On illustre le comportement de $W_n$.
+
+Code R :
+
+```{r}
+# Aggrégation des coûts par contrat
+# Loi de Xi : exponentielle(bet)
+# nb de contrats : n
+# Sn = coûts totaux pour n contrats
+# Wn = coûts par contrat pour un ptf de n contrats
+# Loi de Sn : gamma(n,bet)
+# Loi de Wn : gamma(n,bet*n)
+bet<-1/10
+vn<-10^(0:4)
+vx<-(0:100)/5
+matfWn<-matrix(0,101,5)
+for (i in (1:5))
+{
+ matfWn[,i]<-dgamma(vx,vn[i],bet*vn[i])
+}
+matplot(vx,matfWn,type="l",xlab="x",ylab="fonction de densité de Wn")
+
+
+```
+
+\newpage
+
+## Générateur congruentiel linéaire
+
+Soit $U \sim Unif(0,1)$. Le code R contient une illustration du générateur congruentiel linéaire permettant de produire des réalisations $U^{(j)}$ de la v.a. $U$. 
+
+Code R :
+
+```{r}
+# générateur de réalisations U(j) de la v.a. U \sim Unif(0,1)
+#
+aa<-41358 
+mm<-2^31-1
+x0<-2017
+nn<-1000000
+vx<-rep(0,nn)
+vx[1]<-(aa*x0)%%mm
+for (i in 2:nn)
+{
+ vx[i]<-(aa*vx[i-1])%%mm
+}
+ #cbind(1:nn,vx,vx/mm)
+vU<-vx/mm
+v1<-vU[1:(nn-1)]
+v2<-vU[2:nn]
+#plot(v1,v2)
+mean(vU)
+mean(qexp(vU))
+mean(qgamma(vU,2,1/5))
+# 
+#
+
+
+```
+
+\newpage
+
+## Simulation Monte-Carlo
+
+Soit les v.a. indépendantes $X_1 \sim Gamma(\alpha_1,\beta)$ et $X_2 \sim Gamma(\alpha_2,\beta)$. Le code R contient des calculs en lien avec la simulation Monte-Carlo. 
+
+Code R :
+
+```{r}
+# somme de 2 v.a. indépendantes
+#
+# loi de X1: gamma(a1,bet)
+# loi de X2: gamma(a2,bet)
+a1<-2.5
+a2<-1.5
+bet<-1/10
+nsim<-10^6
+set.seed(2017)
+matU<-matrix(runif(nsim*2),nsim,2,byrow=T)
+#matU
+X1<-qgamma(matU[,1],a1,bet)
+X2<-qgamma(matU[,2],a2,bet)
+matX<-cbind(X1,X2)
+S<-X1+X2
+#cbind(1:nsim,X1,X2,S)
+mean(S)
+mean(1*(S>50))
+quantile(S,c(0.5,0.9),type=1)
+EX1<-a1/bet
+EX2<-a2/bet
+ES<-EX1+EX2
+ES
+xx<-50
+mean(1*(S>xx))
+1-pgamma(xx,a1+a2,bet)
+xx<-100
+mean(1*(S>xx))
+1-pgamma(xx,a1+a2,bet)
+kap<-c(0.5,0.9,0.99,0.999)
+quantile(S,kap,type=1)
+qgamma(kap,a1+a2,bet)
+kap1<-0.99999
+VaRSapp<-quantile(S,kap1,type=1)
+TVaRSapp<-sum(S*1*(S>VaRSapp))/nsim/(1-kap1)
+VaRS<-qgamma(kap1,a1+a2,bet)
+TVaRS<-ES*(1-pgamma(VaRS,a1+a2+1,bet))/(1-kap1)
+c(kap1,VaRSapp,VaRS,TVaRSapp,TVaRS)
+
+```
+
+\newpage
+
+# Modèles de bases en actuariat non-vie
+## Loi Poisson composée avec sinistre individuel de loi gamma
+Le code R permet d'effectuer des calculs en lien avec la loi Poisson composée (avec sinistres indivuels de loi gamma) et les mesures de risque.
+
+Code R : 
+```{r}
+# Lyon
+# A2017
+# Cours Lundi 2017-11-06
+# Loi Poisson composée avec sinistre individuel de loi gamma
+# Loi de M : Poisson 
+lambda=0.5
+EM<-lambda
+VarM<-lambda
+# Loi de B : Gamma
+alp<-5
+bet<-1/200
+EB<-alp/bet
+VarB<-EB/bet
+#
+EX<-EM*EB
+VarX<-EM*VarB+VarM*(EB^2)
+EX
+VarX
+#
+# Fonction de répartition de X
+#
+Fpoisgamma<-function(x,la,aa,bb,kmax=1000)
+{
+ p0<-dpois(0,la)
+ vk<-1:kmax
+ pk<-dpois(vk,la)
+ vprob<-pgamma(x,aa*vk,bb)
+ FX<-p0+sum(pk*vprob)
+ return(FX)
+}
+Fpoisgamma(x=3200,la=lambda,aa=alp,bb=bet,kmax=1000)
+vx<-(0:20)*500
+long<-length(vx)
+vFx<-rep(0,long)
+for(i in 1:long)
+{
+ vFx[i]<-Fpoisgamma(x=vx[i],la=lambda,aa=alp,bb=bet,kmax=1000)
+}
+plot(c(0,vx),c(0,vFx),type="l",xlab="x",ylab="F(x)",main="Loi Pois Comp (B de loi gamma)")
+#
+# VaR et TVaR
+#
+# on utilise cette approche pour kappa > F_X(0)
+Fpoisgamma(0,la=lambda,aa=alp,bb=bet,kmax=1000)
+kappa<-0.9999
+f<-function(x) abs(Fpoisgamma(x,la=lambda,aa=alp,bb=bet,kmax=1000)-kappa)
+res<-optimize(f, c(0,10000),tol=0.000000001)
+res
+VaRX<-res$minimum
+Fpoisgamma(VaRX,la=lambda,aa=alp,bb=bet,kmax=1000)
+TVaRpoisgamma<-function(u,la,aa,bb,kmax=1000,bornes=c(0,10000))
+{
+ kappa<-u
+ f<-function(x) abs(Fpoisgamma(x,la=lambda,aa=alp,bb=bet,kmax=1000)-kappa)
+ res<-optimize(f, bornes,tol=0.000000001)
+ VaR<-res$minimum
+ vk<-1:kmax
+ pk<-dpois(vk,la)
+ vEtronc<-(1-pgamma(VaR,aa*vk+1,bb))*aa/bb*(vk)
+ TVaR<-sum(pk*vEtronc)/(1-u)
+ return(c(VaR,TVaR))
+}
+TVaRpoisgamma(0.9999,la=lambda,aa=alp,bb=bet,kmax=1000,bornes=c(0,10000))
+```
+
+\newpage
+
+## Loi Binomiale négative composée (sinistres de loi lognormale)
+
+Le code R permet d'effectuer des calculs en lien avec la loi binomiale négative composée. la méthode de simulation Monte Carlo et les mesures de risque.
+
+Code R :
+
+```{r}
+# Loi Binomiale négative composée (sinistres de loi lognormale)
+# loi de M: binomiale négative
+rr<-0.5
+qq<-0.5
+EM<-rr*(1-qq)/qq
+VarM<-EM/qq
+# Loi de B : LNormale
+mu<-log(1000)-0.32
+sig<-0.8
+EB<-exp(mu+(sig^2)/2)
+EB2<-exp(2*mu+2*(sig^2))
+VarB<-EB2-(EB^2)
+# X:
+EX<-EM*EB
+VarX<-EM*VarB+VarM*(EB^2)
+EX
+VarX
+# Simulons :
+set.seed(2017)
+nsim<-100000
+vM<-rep(0,nsim)
+vX<-rep(0,nsim)
+for(i in 1:nsim)
+{
+ U<-runif(1)
+ vM[i]<-qnbinom(U,rr,qq)
+ if (vM[i]>0) 
+ {
+ vU<-runif(vM[i])
+ vX[i]<-sum(qlnorm(vU,mu,sig))
+ }
+}
+#cbind(vM,vX)
+plot.ecdf(vX)
+vkap<-(1:9999)/10000
+VaRX<-quantile(vX,prob=vkap,type=1)
+plot(vkap,VaRX,type="l",xlab="kappa",ylab="VaRX")
+```
+
+
+\newpage
+
+# Méthodes d'agrégation
+
+## Algorithme de Panjer
+Le code R comporte 1 exercice en lien avec l'algorithme de Panjer.
+
+Code R :
+```{r}
+# Lyon
+# A2017
+# Cours Mardi 2017-11-06
+# 
+# Algorithme de Panjer
+#
+# Fonction
+#
+panjer.poisson<-function(lam,ff,smax)
+{
+ aa<-0
+ bb<-lam
+ ll<-length(ff)
+ ffs<-exp(lam*(ff[1]-1))
+ ff<-c(ff,rep(0,smax-ll+1))
+ for (i in 1 :smax)
+ {
+ j<-i+1
+ ffs<-c(ffs,(1/(1-aa*ff[1]))*sum(ff[2 :j]*ffs[i :1]*(bb*(1 :i)/i+aa)))
+ }
+ return(ffs)
+}
+#
+# Pareto
+ppareto<-function(x,aa,la)
+{
+ FF<-1-((la/(la+x))^aa)
+ return(FF)
+}
+ppareto(0:10,aa=2,la=5)
+# Utilisation de l'algo de Panjer
+#
+# loi de X : Poisson composée 
+# loi de M : Poisson
+# paramètre de la loi de Poisson : lambda
+# représentation de X : X = \sum_{k=1}^M B_k
+# fmp de B : fB
+# fmp de X : fX
+#
+#
+alphaP<-3
+lambdaP<-20
+vk<-1:10000
+fB<-c(0,ppareto(vk,aa=alphaP,la=lambdaP)-ppareto(vk-1,aa=alphaP,la=lambdaP))
+sum(fB)
+lambda<-2
+EM<-lambda
+EB<-sum(fB*c(0,vk))
+EB2<-sum(fB*c(0,vk^2))
+EX<-EM*EB
+VarX<-lambda*EB2
+EM
+EB
+EX
+VarX
+#
+fX<-panjer.poisson(lam=lambda,ff=fB,smax=18000)
+# 
+# Vérifications
+sum(fX)
+# 
+EXv<-sum((0:18000)*fX)
+EX2v<-sum(((0:18000)^2)*fX)
+VarXv<-EX2v-(EXv^2)
+c(EX,EXv)
+c(VarX,VarXv)
+# FX
+FX<-cumsum(fX)
+plot(c(0,0:600),c(0,FX[1:601]),type="l",xlab="k",ylab="FX(k)",main="Fonction de répartition de X")
+# prime stop-loss
+long<-length(FX)-1
+vk<-0:long
+k<-100
+SL<-sum(pmax(vk-k,0)*fX)
+SL
+#
+# VaR
+#
+FX[1:10]
+kap<-0.00001
+kap
+VaRX.1<-sum((FX<kap)*1)
+VaRX.2<-min(vk[(FX>=kap)])
+VaRX.1
+VaRX.2
+VaRX<-VaRX.2
+EXtron<-sum(vk*fX*(vk>VaRX))
+TVaRX<-(EXtron+VaRX*(FX[1+VaRX]-kap))/(1-kap)
+c(kap,VaRX,TVaRX)
+c(EX,VarX)
+```
+
+\newpage
+
+## FFT
+
+Le code R comporte 3 exercices simples utilisant la méthode FFT.
+
+Code R :
+```{r}
+# Lyon
+# A2017
+# Cours Mardi 2017-11-06
+# 
+# FFT = Transformée de Fourier rapide
+#
+# ------ Exercice de réchauffement - Approche naïve -------
+f1<-c(0.3,0.4,0.2,0.1)
+nbim<-1i
+vk<-0:3
+f1
+sum(f1)
+#
+f1t<-rep(0,4)
+# construction
+for (j in 0:3)
+{
+ f1t[j+1]<-sum(exp(nbim*2*pi*vk*j/4)*f1)
+}
+f1t
+f1v<-rep(0,4)
+# inversion
+for (k in 0:3)
+{
+ f1v[k+1]<-(1/4)*sum(exp(-nbim*2*pi*vk*k/4)*f1t)
+}
+Re(f1v)
+# ----- Exercice pour s'amuser un peu -------
+f1<-c(0.3,0.4,0.2,0.1)
+f2<-c(0.2,0.5,0.25,0.05)
+nn<-8
+f1c<-c(f1,rep(0,4))
+f2c<-c(f2,rep(0,4))
+nbim<-1i
+vk<-0:(nn-1)
+f1c
+sum(f1c)
+f2c
+sum(f2c)
+#
+f1t<-rep(0,nn)
+f2t<-rep(0,nn)
+# construction
+for (j in 0:(nn-1))
+{
+ f1t[j+1]<-sum(exp(nbim*2*pi*vk*j/nn)*f1c)
+ f2t[j+1]<-sum(exp(nbim*2*pi*vk*j/nn)*f2c)
+}
+fst<-f1t*f2t
+cbind(f1t,f2t,fst)
+fsv<-rep(0,nn)
+# inversion
+for (k in 0:(nn-1))
+{
+ fsv[k+1]<-(1/nn)*sum(exp(-nbim*2*pi*vk*k/nn)*fst)
+}
+fs<-rep(0,nn)
+for (k in 1:nn)
+{
+ fs[k]<-sum(f1c[1:k]*f2c[k:1])
+}
+cbind(0:(nn-1),round(Re(fsv),6),fs)
+2^15
+# ----------- Exercice Poisson composée -----------
+#
+# Pareto continue
+ppareto<-function(x,aa,la)
+{
+ FF<-1-((la/(la+x))^aa)
+ return(FF)
+}
+ppareto(0:10,aa=2,la=5)
+#
+# loi de X : Poisson composée 
+# loi de M : Poisson
+# paramètre de la loi de Poisson : lambda
+# représentation de X : X = \sum_{k=1}^M B_k
+# fmp de B : fB
+# fmp de X : fX
+#
+#
+alphaP<-3
+lambdaP<-20
+vk<-1:10000
+# définition du vecteur fB (fonction de masses de prob de la v.a. B)
+fB<-c(0,ppareto(vk,aa=alphaP,la=lambdaP)-ppareto(vk-1,aa=alphaP,la=lambdaP))
+sum(fB)
+# paramètre de la loi Poisson
+lambda<-2
+# calculs
+EM<-lambda
+EB<-sum(fB*c(0,vk))
+EB2<-sum(fB*c(0,vk^2))
+EX<-EM*EB
+VarX<-lambda*EB2
+EM
+EB
+EX
+VarX
+#
+# - On utilise FFT
+nn<-2^15
+nn
+long<-length(fB)
+# On ajoute des "0"
+fBc<-c(fB,rep(0,nn-long))
+# On utilise fft pour calculer les valeurs de la fn caractéristique de B
+fBt<-fft(fBc)
+# on calculer les valeurs de la fn caractéristique de X 
+fXt<-exp(lambda*(fBt-1))
+# on inverse avec fft pour calculer les valeurs de fX
+fX<-Re(fft(fXt,inverse=TRUE)/nn)
+# 
+# Vérifications
+sum(fX)
+# 
+EXv<-sum((0:18000)*fX)
+EX2v<-sum(((0:18000)^2)*fX)
+VarXv<-EX2v-(EXv^2)
+c(EX,EXv)
+c(VarX,VarXv)
+```
+
+\newpage
+
+
+# Lois multivariées discrètes et composées
+
+
+## Loi Poisson bivariée de Teicher
+
+Soit une paire de v.a. $(M_1,M_2)$ avec 
+$$
+\mathcal{P}_{M_{1},M_{2}}(t_{1},t_{2}) =
+^{( \lambda
+_{1}-\alpha _{0}) ( t_{1}-1) }\mathrm{e}^{( \lambda
+_{2}-\alpha _{0}) ( t_{2}-1) }\mathrm{e}^{\alpha _{0}(
+t_{1}t_{2}-1) }\text{, }\left\vert t_{i}\right\vert \leq 1 
+\text{, } 
+i=1,2 \text{. } 
+$$
+
+On définit $N=M_1+M_2$.
+
+On déduit
+$$
+\mathcal{P}_{N}\left( t\right) =\mathcal{P}_{M_{1},M_{2}}\left( t,t\right) 
+\text{, }\left\vert t\right\vert \leq 1\text{,}
+$$
+
+$$
+\mathcal{\phi }_{N}(t) =\mathrm{e}^{(\lambda _{1}-\alpha
+_{0})( \mathrm{e}^{it}-1) }\mathrm{e}^{( \lambda
+_{2}-\alpha _{0})(\mathrm{e}^{it}-1) }\mathrm{e}^{\alpha
+_{0}( \mathrm{e}^{it\times 2}-1) }=\mathcal{P}_{M_{1},M_{2}}
+( \mathcal{\phi }_{B}(t),\mathcal{\phi }_{B}(t)) \text{,}
+$$
+
+où $\mathcal{\phi}_{B}(t) =\mathrm{e}^{it}$.
+
+Objectif : Calculer $\Pr(N=k)$, $k \in \mathbb{N}$, avec Panjer et FFT. 
+
+Code R : 
+
+```{r}
+# Lyon
+# A2017
+# Cours Mercredi 2017-11-08
+#
+# But : calculer Pr(N=k) où N=M1+M2
+# (M1,M2) obéit à une loi Poisson bivariée Teicher
+# 2 options : FFt ou Panjer
+# important : les valeurs calculées sont exactes
+#
+# Algorithme de Panjer
+#
+# Fonction
+#
+panjer.poisson<-function(lam,ff,smax)
+{
+ aa<-0
+ bb<-lam
+ ll<-length(ff)
+ ffs<-exp(lam*(ff[1]-1))
+ ff<-c(ff,rep(0,smax-ll+1))
+ for (i in 1 :smax)
+ {
+ j<-i+1
+ ffs<-c(ffs,(1/(1-aa*ff[1]))*sum(ff[2 :j]*ffs[i :1]*(bb*(1 :i)/i+aa)))
+ }
+ return(ffs)
+}
+#
+# Loi Poisson Bivariée Teicher
+#
+la1<-2
+la2<-3
+al0<-1
+mm<-2^10
+EN<-la1+la2
+CovM1M2<-al0
+VarN<-la1+la2+2*CovM1M2
+# option #1 : FFT
+fB<-rep(0,mm)
+fB[2]<-1
+fBt<-fft(fB)
+fNt<-exp((la1-al0)*(fBt-1))*exp((la2-al0)*(fBt-1))*exp(al0*(fBt^2-1))
+fN<-Re(fft(fNt,inverse=TRUE)/mm)
+sum(fN)
+vk<-0:(mm-1)
+ENv<-sum(vk*fN)
+EN2v<-sum((vk^2)*fN)
+VarNv<-EN2v-(ENv^2)
+c(EN,ENv)
+c(VarN,VarNv)
+# option #2 : Panjer
+laN<-la1+la2-al0
+fC1<-(la1+la2-2*al0)/laN
+fC2<-al0/laN
+fC<-c(0,fC1,fC2)
+fNpanjer<-panjer.poisson(lam=laN,ff=fC,smax=1000)
+sum(fNpanjer)
+vk<-0:(mm-1)
+ENw<-sum(vk*fN)
+EN2w<-sum((vk^2)*fN)
+VarNw<-EN2w-(ENw^2)
+c(EN,ENv,ENw)
+c(VarN,VarNv,VarNw)
+round(cbind(0:30,fN[1:31],fNpanjer[1:31]),6)
+```
+
+\newpage
+
+## Loi composée bivariée
+
+Soit une paire de v.a. $(M_1,M_2)$ avec 
+$$
+\mathcal{P}_{M_1,M_2}(t_1,t_2) 
+=(p_{00}+p_{10}t_{1}+p_{01}t_{2}+p_{11}t_{1}t_{2}) ^{n}\text{, }
+\left\vert t_{i}\right\vert \leq 1\text{,}i=1,2\text{.}
+$$
+On définit une paire de v.a. v.a. $(X_1,X_2)$ avec 
+$$
+X_1=\sum_{k_{1}
+=1}^{M_1}B_{1,k_1} \text{ et } X_{2}
+=\sum_{k_2=1}^{M_2}B_{2,k_2}
+$$
+où 
+\begin{itemize}
+\item 
+$\underline{B}_{1}$
+= $\{B_{1,k_1},k_1 \in \mathbb{N}^{+}\} $ 
+forme une suite de v.a. i.i.d. avec $B_{1,k_1}\sim B_1$, $k_1\in \mathbb{N}^{+}$ ;
+
+\item 
+$\underline{B}_{2}$
+= $\{B_{2,k_2},k_2 \in \mathbb{N}^{+}\} $ 
+forme une suite de v.a. i.i.d. avec $B_{2,k_2}\sim B_2$, $k_2\in \mathbb{N}^{+}$ ;
+
+\item $\underline{B}_1$, $\underline{B}_2$ et $(M_1,M_2) 
+$ sont indépendantes ;
+
+\item $B_{1}\sim Pois(\lambda)$ 
+et $B_{2}\sim BN\acute{e}g(r,q)$. 
+
+\end{itemize}
+
+
+
+On définit $S=X_1+X_2$.
+
+On déduit
+$$
+\mathcal{P}_{S}(t) 
+=\mathcal{P}_{X_1,X_2}(t,t) 
+=\mathcal{P}_{M_1,M_2}(\mathcal{P}_{B_1}(t),\mathcal{
+P}_{B_2}(t))\text{, }\left\vert t\right\vert \leq 1
+\text{,}
+$$
+et
+$$
+\mathcal{\phi}_{S}(t)
+=\mathcal{\phi}_{X_1,X_2}(t,t) 
+=\mathcal{P}_{M_1,M_2}(\mathcal{\phi}_{B_1}(t),\mathcal{\phi }_{B_2}(t)) \text{.}
+$$
+
+Expression de la f.g.p. de $(X_1,X_2)$ :
+$$
+\mathcal{P}_{X_1,X_2}(t_1,t_2) 
+=\mathcal{P}_{M_1,M_2}(\mathcal{P}_{B_1}(t_1),\mathcal{P}_{B_2}(t_2))\text{, }\left\vert t_i\right\vert
+\leq 1\text{, }i=1,2\text{.}
+$$
+
+Expression de la f.c. de $(X_1,X_2)$ :
+$$
+\mathcal{\phi}_{X_1,X_2}(t_1,t_2) 
+=\mathcal{P}_{M_1,M_2}(\mathcal{\phi}_{B_1}(t_1),
+\mathcal{\phi}_{B_2}(t_2))\text{.}
+$$
+
+
+
+Objectif : Calculer $\Pr(S=k)$, $k\in\mathbb{N}$, avec FFT. 
+
+Code R : 
+```{r}
+# Lyon
+# A2017
+# Cours Mercredi 2017-11-08
+#
+# Loi de (X_1,X_2) : binomiale composée bivariée
+# Loi de B1 : discrètes
+# Loi de B2 : discrètes
+# S = X_1 + X_2
+# But : calculer Pr(S=k) où N=M1+M2
+# 1 option présentéee : FFt
+# important : les valeurs calculées sont exactes
+#
+p00<-0.7
+p10<-0.15
+p01<-0.05
+p11<-0.1
+p00+p01+p10+p11
+nn<-10
+q1<-p10+p11
+q2<-p01+p11
+q1
+q2
+EM1<-nn*q1
+EM2<-nn*q2
+mm<-2^10
+vk<-0:(mm-1)
+fB1<-dpois(vk,2)
+fB2<-dnbinom(vk,1.5,1/3)
+EB1<-2
+EB2<-1.5*(1-1/3)/(1/3)
+EX1<-EM1*EB1
+EX2<-EM2*EB2
+ES<-EX1+EX2
+ES
+fB1t<-fft(fB1)
+fB2t<-fft(fB2)
+fSt<-(p00+p10*fB1t+p01*fB2t+p11*fB1t*fB2t)^nn
+fS<-Re(fft(fSt,inverse=TRUE)/mm)
+sum(fS)
+ESv<-sum(vk*fS)
+ES
+ESv
+plot(0:40,fS[1:41],type="h",xlab="k",ylab="fS(k)",main="Fonction de masse de probabilité de S")
+```
+
+
+\newpage
+
+# Remerciements
+
+Merci à Christopher Blier-Wong et Simon-Pierre Gadoury pour le disponibilité et leur motivation.
+
+Merci aux étudiantes et aux étudiants de notre laboratoire ACT&RISK pour leur collaboration.
+
+Merci aux étudiants de mes cours (Université Laval, Université Lyon 1, McGill University) pour leur participation et leur patience.
+
+\newpage
+
+#Références
+
+
